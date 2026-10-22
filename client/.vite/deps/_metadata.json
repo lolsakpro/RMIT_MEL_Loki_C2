@@ -1,0 +1,43 @@
+{
+  "hash": "3b9e46b5",
+  "configHash": "3666618f",
+  "lockfileHash": "5357779c",
+  "browserHash": "25c3cc36",
+  "optimized": {
+    "react/jsx-dev-runtime": {
+      "src": "../../node_modules/react/jsx-dev-runtime.js",
+      "file": "react_jsx-dev-runtime.js",
+      "fileHash": "704094a8",
+      "needsInterop": true
+    },
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "99905a27",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "0d092961",
+      "needsInterop": true
+    },
+    "@tidecloak/react": {
+      "src": "../../node_modules/@tidecloak/react/dist/esm/index.js",
+      "file": "@tidecloak_react.js",
+      "fileHash": "b838bfb1",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-TWJRYSII": {
+      "file": "chunk-TWJRYSII.js"
+    },
+    "tidecloak-dpop-QFFVRUES": {
+      "file": "tidecloak-dpop-QFFVRUES.js"
+    },
+    "chunk-DC5AMYBS": {
+      "file": "chunk-DC5AMYBS.js"
+    }
+  }
+}
