@@ -1,0 +1,17 @@
+{
+  "name": "tidevote-server",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@tidecloak/verify": "latest",
+    "better-sqlite3": "^11.0.0",
+    "express": "^4.19.2"
+  },
+  "allowScripts": {
+    "better-sqlite3@11.10.0": true
+  }
+}
