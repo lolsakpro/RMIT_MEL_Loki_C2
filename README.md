@@ -148,3 +148,5 @@ For a local prototype, install dependencies in `client/` and `server/`, and run 
 For TideCloak mode, export the adapter JSON from the intended realm and install it with `node scripts/install-tidecloak-adapter.mjs <export-file> <expected-realm>`. The scaffold checks the realm name, client, embedded verification key, and `vendorId`, then copies the export to the ignored `client/public/tidecloak.json` path. Set `VITE_AUTH_MODE=tide` for the client and `ENABLE_DEMO_AUTH=false` for the server. No live adapter export is present in this repository, so the realm cannot yet be verified. Never commit deployment credentials or secrets.
 
 The Vite development and preview servers include Tide's DPoP relay route and required headers. Production hosting must provide the matching `/tide_dpop/:path*` rewrite and relay headers. Exercise the full login, grant, re-encryption, counsellor decryption, and revoke flow against the target TideCloak/ORK before using real wellbeing data.
+
+"YOU NEED TO HAVE BACKGROUUND SHELL RUNNING FOR IT TO WORK"
