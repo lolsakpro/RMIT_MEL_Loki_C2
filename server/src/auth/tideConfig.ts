@@ -6,6 +6,7 @@ export interface TideAdapterConfig {
   realm: string;
   "auth-server-url": string;
   resource: string;
+  vendorId?: string;
   jwk: JSONWebKeySet;
 }
 

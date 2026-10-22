@@ -10,7 +10,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@tidecloak/js": "0.14.41",
     "@tidecloak/react": "0.14.33",
+    "@tideorg/js": "0.14.29",
+    "heimdall-tide": "0.14.41",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

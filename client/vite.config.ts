@@ -40,4 +40,6 @@ function tideDpopRelay(): Plugin {
 
 export default defineConfig({
   plugins: [react(), tideDpopRelay()],
+  server: { host: "localhost" },
+  preview: { host: "localhost" },
 });

@@ -21,17 +21,17 @@ The app **must be built with TideCloak** (Tide Foundation's identity, access and
 
 | Role | Can do | Cannot do |
 |------|--------|-----------|
-| `student` | Write entries, view own entries, share/revoke an entry with a counsellor | See other students' entries |
-| `counsellor` | Read entries a student has shared with them, add their own notes | Read anything not shared with them |
-| `admin` | Manage accounts, see that entries exist (metadata only) | **Read entry content (key demo moment)** |
+| `student` | Write entries, view own entries, request a one-entry share, revoke it | See other students' entries |
+| `counsellor` | Read entries a student has shared with them; write private encrypted counsellor notes | Read anything not shared with them, or read another counsellor's private notes |
+| `admin` | Review share requests and see entry metadata | **Read entry content** |
 
 ## 4. Features
 
-**Minimum version (build this first):**
+**Prototype features:**
 1. Log in with TideCloak, with role-based landing pages
 2. Student creates an entry, stored **encrypted**
-3. Student shares an entry with a counsellor
-4. Student revokes access
+3. Student requests access for one counsellor; a Tide realm administrator approves the per-entry policy
+4. Student revokes access; the current note is returned to the student's private encryption
 5. Access log, e.g. "Counsellor X viewed this entry on Tuesday"
 
 **Nice to have (only if time allows):**
@@ -64,64 +64,29 @@ We have the **TideCloak MCP server** (Tide's MCP, also referred to as Raziel) in
 3. If it is stopped, start or restart it from that list
 4. Open Copilot Chat, switch to **Agent mode**, and check the tools icon shows the TideCloak tools
 
-## 7. Setup (do these in order)
+## 7. Tide per-entry sharing model
 
-### Step 1: Run TideCloak locally (needs Docker Desktop)
-Follow the official guide: https://github.com/tide-foundation/tidecloak-gettingstarted
+KADS uses Tide's built-in `RelationshipAttestation:1` contract, not a custom contract. The policy binds a Tide user to one entry ID:
 
-In short: run the `tideorg/tidecloak-dev:latest` Docker image, open the admin console at `http://localhost:8080`, and activate your TideCloak license in the Tide identity provider settings.
+- Notes begin with Tide self-encryption. Plaintext is encrypted in the student's browser.
+- A student submits a share request for one counsellor and chooses an expiry (1 hour, 24 hours, or 7 days).
+- A separate Tide realm administrator approves two signed policies: read/write for the student and read-only for that counsellor. The student then re-encrypts the entry under the per-entry policy in their browser.
+- The server stores only ciphertext and the signed policies. The counsellor API returns ciphertext only while the app share is active and unexpired; the counsellor decrypts in their browser.
+- On revocation, the API immediately stops returning the shared entry and the student's browser re-encrypts the current note back to private self-encryption. The signed counsellor policy may still work against a copy already downloaded until its expiry; no system can retract plaintext already seen or copied.
 
-> **One teammate does this first and writes the exact commands they used below**, so the others can copy them.
+The target ORK must include `RelationshipAttestation:1` (available on ORK `main`, verified 2026-10-16; older deployments may not include it). The target realm also needs IGA and the role `tide-realm-admin` for approvers. A database sharing row or UI state is not cryptographic authorization.
 
-```
-(paste the working commands here)
-```
+## 8. Setup and test users
 
-### Step 2: Create the React app
+Use the Tide relationship-attestation scenario bootstrap instructions before provisioning a realm. Choose hosting before starting TideCloak, confirm the target ORK includes the built-in contract, and configure a licensed realm with IGA. Export the adapter to `client/public/tidecloak.json`; it must include its embedded verification key and `vendorId`. The API rejects tokens unless JWT and DPoP verification both pass.
 
-```bash
-npm create vite@latest tidecloak-react -- --template react-ts
-cd tidecloak-react
-npm install @tidecloak/react
-```
+Create the realm roles `student`, `counsellor`, `admin`, `_tide_wellbeing.selfencrypt`, and `_tide_wellbeing.selfdecrypt`. Also declare the contract roles `_tide_encryptor` and `_tide_decryptor` as realm roles. Grant:
 
-Export your realm/client settings from the TideCloak admin console as `tidecloak.json`, then wrap the app with `TideCloakContextProvider`:
+- Students: `student`, private-note self-encrypt/decrypt, and `_tide_encryptor` + `_tide_decryptor` so they can migrate a note to a relationship policy after approval.
+- Counsellors: `counsellor`, `_tide_decryptor`, `_tide_counsellor-notes.selfencrypt`, and `_tide_counsellor-notes.selfdecrypt`. Do not grant `_tide_encryptor` unless they need to write shared records.
+- Platform administrators: `admin`; the people who approve relationship policies additionally need `tide-realm-admin` on `realm-management`.
 
-```tsx
-import { TideCloakContextProvider } from '@tidecloak/react'
-import tidecloakConfig from '../tidecloak.json'
-```
-
-Use the `Authenticated` and `Unauthenticated` components and the `useTideCloak` hook for login state.
-
-### Step 3: Create roles and test users
-In the TideCloak admin console, create the roles `student`, `counsellor`, `admin`, then create one test user per role for demos.
-
-### Step 4: Encryption
-The SDK exposes `doEncrypt(data)` and `doDecrypt(data)`. Encrypting a string returns something that decrypts back to a string.
-
-Flow:
-1. Student types an entry
-2. App calls `doEncrypt`, and only scrambled data leaves the browser
-3. Backend stores the encrypted data
-4. App calls `doDecrypt` when reading it
-
-### Step 5: Backend
-A small Express server that only stores and returns **encrypted** entries, plus a table of "entry X is shared with counsellor Y" and an access log. **The backend must never see plaintext notes.**
-
-## 8. Open risk: per-entry sharing (test this on day one)
-
-We have confirmed encrypt and decrypt exist, but we have **not confirmed** whether a counsellor can decrypt an entry a student encrypted. Test this first:
-
-1. Log in as a student, encrypt a test string
-2. Log in as a counsellor, try to decrypt it
-3. Record the result here:
-
-```
-(result goes here)
-```
-
-**If it fails:** ask the TideCloak MCP how encryption relates to roles/permissions, and check with a mentor. **Fallback:** enforce sharing in our backend (access rules) and be honest in the pitch about what is enforced at the encryption level and what is enforced by our app.
+Users must sign in once before KADS can create a per-user grant for them. Role changes require IGA approval and a token refresh/sign-in before they take effect.
 
 ## 9. Suggested folder structure
 
@@ -144,13 +109,12 @@ RMIT_MEL_Loki_C2/
 
 ## 11. Build order
 
-1. TideCloak running + React login working (highest risk, do first)
-2. Roles and test users
-3. Student: write and list entries (encrypted)
-4. Counsellor: view shared entries
-5. Share and revoke
-6. Access log
-7. Demo polish
+1. Confirm the ORK contract, hosting choice, and Tide realm configuration
+2. TideCloak login, IGA roles, and test users
+3. Student: write and list self-encrypted entries
+4. Admin: approve a per-entry relationship policy
+5. Student: re-encrypt the approved entry; counsellor: read it
+6. Student: revoke, return the current note to self-encryption, and review access history
 
 ## 12. Team split
 
@@ -169,71 +133,18 @@ RMIT_MEL_Loki_C2/
 - Pushing over HTTPS needs a **Personal Access Token** as the password (GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → tick `repo`)
 - Make sure you have accepted the collaborator invite to `lolsakpro/RMIT_MEL_Loki_C2`
 
-## 14. Demo script (2 minutes)
+## 14. Current implementation
 
-1. Student logs in and writes an entry
-2. Show the database as the admin sees it: **only scrambled data**
-3. Student shares the entry, and the counsellor reads it
-4. Student revokes access, and the counsellor loses it
-5. Show the access log
+- React/Vite client, Express API, and SQLite storage.
+- TideCloak login, role-specific student/counsellor/admin views, and browser-side encryption/decryption.
+- JWT signature, role, and DPoP proof validation on protected API routes.
+- One counsellor share request per entry, admin policy-signing UI, read-only access to student entries, expiry, and student revocation.
+- Counsellors can add separate notes encrypted to their own Tide identity; students and admins do not receive or decrypt those notes.
+- Admin metadata view excludes note content and ciphertext.
+- Student access history records app-reported successful note openings; it is not proof against a malicious client.
 
-## 15. Application foundation
+For a local prototype, install dependencies in `client/` and `server/`, and run `npm run dev` in each directory. The server's development script defaults to simulated demo auth until explicitly disabled; the demo API binds only to localhost. Demo mode uses mock role headers and a public client-side encryption key; never enter real wellbeing data. This is not TideCloak authentication or encryption.
 
-The initial implementation is in `client/` and `server/`:
+For TideCloak mode, export the adapter JSON from the intended realm and install it with `node scripts/install-tidecloak-adapter.mjs <export-file> <expected-realm>`. The scaffold checks the realm name, client, embedded verification key, and `vendorId`, then copies the export to the ignored `client/public/tidecloak.json` path. Set `VITE_AUTH_MODE=tide` for the client and `ENABLE_DEMO_AUTH=false` for the server. No live adapter export is present in this repository, so the realm cannot yet be verified. Never commit deployment credentials or secrets.
 
-- TideCloak login with role-specific student, counsellor, and admin views
-- Students encrypt notes in their browser with the `wellbeing` tag before sending them to the API
-- The API verifies the Tide JWT using the adapter's embedded key and requires a valid DPoP proof
-- The API stores ciphertext only; a student can list and decrypt only their own entries
-- Admins can see entry IDs and timestamps, never ciphertext or note content
-- A student-owned access log is available for their entries
-
-**Counsellor sharing and revocation are deliberately not enabled yet.** Tide's verified
-`RelationshipAttestation:1` flow requires a signed per-entry policy, `_tide_encryptor` and
-`_tide_decryptor` roles, and an admin approval. A backend sharing row by itself would not grant
-cryptographic access. Keep notes private until that policy workflow has been configured and tested.
-
-### Run the app after installing Node.js 18+
-
-1. Start local Docker (Docker Desktop or a Docker-compatible runtime such as Colima), then run this
-   bootstrap from `client/` in a regular Mac Terminal:
-
-   ```bash
-   cp ../.tide-pack/templates/shared/.env.template .env
-   # Set KC_BOOTSTRAP_ADMIN_PASSWORD and the previously supplied TIDE_LICENSE_EMAIL /
-   # TIDE_TERMS_ACCEPTED=yes in this ignored file.
-   ADAPTER_OUTPUT=public/tidecloak.json CLIENT_APP_URL=http://localhost:5173 \
-     bash ../.tide-pack/templates/shared/bootstrap-tidecloak.sh
-   ```
-
-   The bootstrap needs Docker, curl, and jq. The Tide script uses `sudo` for local data permissions,
-   so run it in Terminal and enter your Mac administrator password when prompted. This is not a
-   Docker Hub or Node account. It prints an invite link that you must open yourself. Do not put the
-   Tide master-admin password in source control or in a shell command.
-2. From `client/`, install dependencies and start Vite:
-
-   ```bash
-   cd client
-   npm install
-   npm run dev
-   ```
-
-3. In a second terminal, copy `server/.env.example` to `server/.env`, then start the API:
-
-   ```bash
-   cd server
-   cp .env.example .env
-   npm install
-   npm run dev
-   ```
-
-4. Before logging in, export the Tide adapter to `client/public/tidecloak.json`. The API expects
-   this same adapter and rejects requests unless JWT and DPoP verification both pass.
-5. Create the `student`, `counsellor`, and `admin` realm roles. For private note encryption, also
-   configure `_tide_wellbeing.selfencrypt` and `_tide_wellbeing.selfdecrypt` per the Tide E2EE
-   playbook. Do not assign counsellor decryption access until the per-entry sharing policy flow is
-   implemented and tested.
-
-The Vite dev and preview servers include the Tide DPoP relay route and its required response
-headers. A production static host still needs the matching `/tide_dpop/:path*` rewrite and relay
-headers from the Tide DPoP asset guidance.
+The Vite development and preview servers include Tide's DPoP relay route and required headers. Production hosting must provide the matching `/tide_dpop/:path*` rewrite and relay headers. Exercise the full login, grant, re-encryption, counsellor decryption, and revoke flow against the target TideCloak/ORK before using real wellbeing data.

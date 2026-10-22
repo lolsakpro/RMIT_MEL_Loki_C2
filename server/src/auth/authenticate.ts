@@ -58,11 +58,51 @@ export function createAuthenticator(config: TideAdapterConfig) {
   };
 }
 
+export function createDemoAuthenticator() {
+  return function authenticateDemo(req: Request, res: Response, next: NextFunction): void {
+    const role = req.get("x-kads-demo-role");
+    const sub = req.get("x-kads-demo-sub");
+    const demoUsers = {
+      student: { sub: "demo-student", key: "demo-key-student", name: "Alex Morgan" },
+      counsellor: { sub: "demo-counsellor", key: "demo-key-counsellor", name: "Sam Taylor" },
+      admin: { sub: "demo-admin", key: "demo-key-admin", name: "KADS Administrator" },
+    } as const;
+    if (
+      (role !== "student" && role !== "counsellor" && role !== "admin")
+      || !sub || demoUsers[role].sub !== sub
+    ) {
+      res.status(401).json({ error: "Choose a valid local demo account." });
+      return;
+    }
+    const user = demoUsers[role];
+    req.auth = {
+      sub: user.sub,
+      name: user.name,
+      preferred_username: user.name,
+      tideuserkey: user.key,
+      realm_access: { roles: [role] },
+      ...(role === "admin" ? { resource_access: { "realm-management": { roles: ["tide-realm-admin"] } } } : {}),
+    };
+    next();
+  };
+}
+
 export function requireRealmRole(role: string) {
   return function checkRole(req: Request, res: Response, next: NextFunction): void {
     const roles = req.auth?.realm_access?.roles;
     if (!roles?.includes(role)) {
       res.status(403).json({ error: `The ${role} role is required.` });
+      return;
+    }
+    next();
+  };
+}
+
+export function requireClientRole(clientId: string, role: string) {
+  return function checkClientRole(req: Request, res: Response, next: NextFunction): void {
+    const roles = req.auth?.resource_access?.[clientId]?.roles;
+    if (!roles?.includes(role)) {
+      res.status(403).json({ error: `The ${role} role on ${clientId} is required.` });
       return;
     }
     next();
